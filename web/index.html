@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>JARVIS KR</title>
+  <meta name="theme-color" content="#111317">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <style>
+    :root{ --bg:#0b0e12; --panel:#11161d; --text:#e6eaf0; --muted:#97a1b0; --accent:#5aa8ff; --ok:#74d68a; --warn:#ffcd6b; }
+    *{box-sizing:border-box} html,body{height:100%; margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans KR',sans-serif}
+    .app{max-width:720px; margin:0 auto; padding:18px; display:grid; gap:14px}
+    header{display:flex; justify-content:space-between; align-items:center; gap:8px}
+    .brand{display:flex; align-items:center; gap:10px}
+    .logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#18202b,#0f1217);display:grid;place-items:center;border:1px solid #1e2630}
+    .title{font-weight:700; letter-spacing:.3px}
+    .controls{display:flex; gap:8px; flex-wrap:wrap}
+    button{background:var(--panel); color:var(--text); border:1px solid #1e2630; border-radius:12px; padding:10px 14px; cursor:pointer}
+    button.primary{background:var(--accent); border-color:#2a6fb9; color:#fff}
+    .panes{display:grid; gap:12px}
+    .card{background:#0f141a; border:1px solid #1e2630; border-radius:14px; padding:12px}
+    .row{display:flex; justify-content:space-between; align-items:center; gap:8px; margin:6px 0}
+    .muted{color:var(--muted); font-size:12px}
+    textarea,input{width:100%; background:#0f141a; color:var(--text); border:1px solid #1e2630; border-radius:10px; padding:10px}
+    #log{max-height:40vh; overflow:auto; font-size:14px; line-height:1.4}
+    .logline{padding:6px 8px; border-bottom:1px dashed #1e2630}
+    .you{color:#b7d2ff} .ai{color:#e6ffe6}
+    .hint{color:var(--muted); font-size:12px}
+    .pill{padding:4px 10px; border-radius:999px; border:1px solid #1e2630; background:#0b0f15; font-size:12px}
+    .flex{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="logo">🎙</div>
+      <div class="title">JARVIS KR</div>
+      <span id="pwaStatus" class="pill">Android App (Capacitor)</span>
+    </div>
+    <div class="controls">
+      <button id="btnMic" class="primary">🎙 말하기 (Shift+Space)</button>
+      <button id="btnSpeak">🔈 음성</button>
+      <button id="btnClear">🧹 로그지우기</button>
+    </div>
+  </header>
+
+  <section class="panes">
+    <div class="card">
+      <div class="row"><b>명령 예시</b></div>
+      <div class="hint">
+        “자비스 타이머 3분”, “자비스 알람 07:30”, “자비스 계산 (2+3)*5”, “자비스 변환 10 km to m”, “자비스 메모 추가 내일 회의”
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row"><b>텍스트로 명령</b></div>
+      <div class="flex">
+        <input id="textCmd" placeholder="예: 자비스 타이머 2분" />
+        <button id="btnRun">실행</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row"><b>로그</b></div>
+      <div id="log"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+// --- TTS toggle ---
+let speakOn = false;
+const btnSpeak = document.getElementById('btnSpeak');
+btnSpeak.onclick = () => {
+  speakOn = !speakOn;
+  btnSpeak.textContent = speakOn ? '🔇 음성끄기' : '🔈 음성';
+};
+function say(text){
+  if (!speakOn) return;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'ko-KR';
+  speechSynthesis.speak(u);
+}
+
+// --- Logger ---
+const logEl = document.getElementById('log');
+function log(role, text){
+  const div = document.createElement('div');
+  div.className = 'logline ' + (role==='you'?'you':'ai');
+  div.textContent = (role==='you'?'[나] ':'[자비스] ') + text;
+  logEl.prepend(div);
+}
+
+// --- Commands ---
+function runCommand(input){
+  const s = input.trim();
+  if (!s) return;
+  log('you', s);
+  try {
+    let m = s.match(/타이머\s*(\d+)\s*분?/);
+    if (m){
+      const mins = parseInt(m[1],10);
+      setTimeout(()=>{ log('ai', `${mins}분 타이머 종료`); say(`${mins}분 타이머가 끝났습니다`); }, mins*60000);
+      log('ai', `타이머 시작: ${mins}분`); say(`타이머를 ${mins}분으로 설정했습니다`); return;
+    }
+    m = s.match(/알람\s*(\d{1,2}):(\d{2})/);
+    if (m){
+      const hh = parseInt(m[1],10), mm = parseInt(m[2],10);
+      const now = new Date(); const alarm = new Date();
+      alarm.setHours(hh, mm, 0, 0);
+      if (alarm <= now) alarm.setDate(alarm.getDate()+1);
+      const dt = alarm - now;
+      setTimeout(()=>{ log('ai', `알람: ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`); say('알람 시간입니다'); }, dt);
+      log('ai', `알람 설정: ${hh.toString().padStart(2,'0')}:${mm.toString().padStart(2,'0')}`);
+      say('알람을 설정했습니다'); return;
+    }
+    m = s.match(/계산\s*(.+)$/);
+    if (m){
+      const expr = m[1];
+      if (!/^[-+/*().\d\s]+$/.test(expr)) throw new Error('식에 허용되지 않은 문자가 있습니다');
+      const result = Function(`"use strict"; return (${expr})`)();
+      log('ai', `결과: ${result}`); say(`결과는 ${result}`); return;
+    }
+    m = s.match(/변환\s*(\d+(?:\.\d+)?)\s*(km|m|cm|mm)\s*(?:to|->|에서\s*|)\s*(km|m|cm|mm)/i);
+    if (m){
+      const v = parseFloat(m[1]); const scale={km:1000,m:1,cm:0.01,mm:0.001};
+      const out = v * (scale[m[2]]/scale[m[3]]);
+      log('ai', `${v} ${m[2]} = ${out} ${m[3]}`); say(`${v} ${m[2]} 는 ${out} ${m[3]}`); return;
+    }
+    if (/메모\s*추가\s+(.+)/.test(s)){
+      const item = s.replace(/.*메모\s*추가\s+/, '');
+      const list = JSON.parse(localStorage.getItem('jarvis_memos')||'[]');
+      list.push({t:Date.now(), text:item}); localStorage.setItem('jarvis_memos', JSON.stringify(list));
+      log('ai', `메모 추가: ${item}`); say('추가했습니다'); return;
+    }
+    if (/메모\s*(목록|리스트)/.test(s)){
+      const list = JSON.parse(localStorage.getItem('jarvis_memos')||'[]');
+      if (list.length===0){ log('ai','메모 없음'); return; }
+      list.slice(-5).reverse().forEach(x=>log('ai','- '+x.text)); return;
+    }
+    if (/메모\s*(모두\s*)?삭제/.test(s)){
+      localStorage.removeItem('jarvis_memos'); log('ai','메모 전체 삭제'); return;
+    }
+    if (/시간|몇시/.test(s)){
+      const now = new Date(); const hh = now.getHours(), mm = String(now.getMinutes()).padStart(2,'0');
+      log('ai', `지금 시간은 ${hh}시 ${mm}분`); say(`지금은 ${hh}시 ${mm}분입니다`); return;
+    }
+    if (/날짜|며칠/.test(s)){
+      const now = new Date(); const txt = now.toLocaleDateString('ko-KR', {year:'numeric', month:'long', day:'numeric', weekday:'long'});
+      log('ai', `오늘은 ${txt}`); say(`오늘은 ${txt}`); return;
+    }
+    log('ai','명령을 이해하지 못했습니다. 예: "자비스 타이머 3분"');
+  } catch(err){ log('ai','오류: '+err.message); }
+}
+
+// --- Speech Recognition (if available in WebView/Chrome engine) ---
+let rec = null, listening = false;
+const btnMic = document.getElementById('btnMic');
+function toggleRec(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR){ log('ai','이 환경은 STT를 직접 지원하지 않습니다. (WebView 버전에 따라 다름)'); return; }
+  if (listening){ rec && rec.stop(); return; }
+  rec = new SR(); rec.lang='ko-KR'; rec.interimResults=false; rec.continuous=false;
+  rec.onstart=()=>{ listening=true; btnMic.textContent='🛑 그만'; };
+  rec.onend=()=>{ listening=false; btnMic.textContent='🎙 말하기 (Shift+Space)'; };
+  rec.onerror=e=>log('ai','STT 오류: '+e.error);
+  rec.onresult=e=>{ const text=e.results[0][0].transcript; log('you', text); runCommand(text); };
+  rec.start();
+}
+btnMic.onclick = toggleRec;
+document.addEventListener('keydown', (e)=>{ if (e.shiftKey && e.code==='Space'){ e.preventDefault(); toggleRec(); } });
+document.getElementById('btnRun').onclick = () => { const v = document.getElementById('textCmd').value; if (v) runCommand(v); };
+document.getElementById('btnClear').onclick = () => { document.getElementById('log').innerHTML=''; };
+</script>
+</body>
+</html>

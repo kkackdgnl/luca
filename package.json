@@ -1,0 +1,21 @@
+{
+  "name": "jarvis-kr-capacitor",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "serve": "npx http-server ./web -p 8080 -c-1",
+    "cap:add:android": "npx cap add android",
+    "cap:copy": "npx cap copy",
+    "cap:open": "npx cap open android",
+    "android": "npm run cap:copy && npm run cap:open"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.2",
+    "http-server": "^14.1.1",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/core": "^6.1.2"
+  }
+}
